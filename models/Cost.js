@@ -36,6 +36,7 @@ const costSchema = new mongoose.Schema(
       required: true,
       min: 0,
     },
+    // Cost creation time is stored with the cost.
     // Date defaults to the time the cost is created.
     date: {
       type: Date,

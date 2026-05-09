@@ -19,6 +19,11 @@ const logger = pino({ name: serviceName });
 // Allows the service to read JSON request bodies.
 app.use(express.json());
 
+/*
+ * Computed Design Pattern implementation:
+ * reports for months that already ended are computed once, saved in the
+ * reports collection, and returned from that collection in later requests.
+ */
 // Report documents cache old monthly reports.
 const reportSchema = new mongoose.Schema(
   {
@@ -41,6 +46,35 @@ reportSchema.index({ userid: 1, year: 1, month: 1 }, { unique: true });
 
 const Report =
   mongoose.models.Report || mongoose.model('Report', reportSchema, 'reports');
+
+// Creates a normal Error object with an HTTP status code.
+const createHttpError = (message, statusCode) => {
+  const error = new Error(message);
+
+  // The error middleware reads this property.
+  error.statusCode = statusCode;
+  return error;
+};
+
+// Checks whether a value can be used as a number.
+const isValidNumber = (value) =>
+  value !== undefined && value !== null && Number.isFinite(Number(value));
+
+// Checks whether the given value is a non-empty string.
+const isNonEmptyString = (value) =>
+  typeof value === 'string' && value.trim().length > 0;
+
+// Returns true when the given date is before today.
+const isPastDate = (dateValue) => {
+  const date = new Date(dateValue);
+  const today = new Date();
+
+  // Compare only the calendar date, not the current hour.
+  today.setHours(0, 0, 0, 0);
+  date.setHours(0, 0, 0, 0);
+
+  return date < today;
+};
 
 // Request logging is repeated in every service.
 // Persists every incoming request into the logs collection.
@@ -87,14 +121,7 @@ const buildReportSkeleton = (userId, year, month) => ({
   year,
   month,
   // Every category exists even when it has no costs.
-  costs: {
-    food: [],
-    health: [],
-    // Empty arrays make the report shape predictable.
-    housing: [],
-    sports: [],
-    education: [],
-  },
+  costs: allowedCategories.map((category) => ({ [category]: [] })),
 });
 
 // A report is cacheable only when the month is fully in the past.
@@ -114,7 +141,10 @@ const buildComputedReport = (userId, year, month, costs) => {
 
   // Each item is placed under its matching category.
   costs.forEach((item) => {
-    report.costs[item.category].push({
+    const categoryGroup = report.costs.find((group) => group[item.category]);
+
+    // Category group exists because categories are validated on insert.
+    categoryGroup[item.category].push({
       sum: item.sum,
       description: item.description,
       // Report item stores only the day number.
@@ -136,16 +166,46 @@ app.post('/api/add', async (req, res, next) => {
   try {
     const { userid, description, category, sum, date } = req.body;
 
-    // Category must match the assignment categories.
-    if (!allowedCategories.includes(String(category).toLowerCase())) {
-      const error = new Error(
-        `Category must be one of: ${allowedCategories.join(', ')}`
-      );
-      // Invalid categories are client input errors.
-      error.statusCode = 400;
-      throw error;
+    // Required fields must be present and valid.
+    if (!isValidNumber(userid)) {
+      throw createHttpError('userid must be a valid number', 400);
     }
 
+    // Description must explain the cost item.
+    if (!isNonEmptyString(description)) {
+      throw createHttpError('description must be a non-empty string', 400);
+    }
+
+    // Sum must be numeric and cannot be negative.
+    if (!isValidNumber(sum) || Number(sum) < 0) {
+      throw createHttpError('sum must be a non-negative number', 400);
+    }
+
+    // Category is validated before saving.
+    // Category must match the assignment categories.
+    if (!allowedCategories.includes(String(category).toLowerCase())) {
+      throw createHttpError(
+        `Category must be one of: ${allowedCategories.join(', ')}`,
+        400
+      );
+    }
+
+    // Date is optional; missing date uses the schema default.
+    if (date !== undefined) {
+      const parsedDate = new Date(date);
+
+      // Date must be valid when the client sends it.
+      if (Number.isNaN(parsedDate.getTime())) {
+      throw createHttpError('date must be a valid date', 400);
+      }
+
+      // Past dates are rejected by project requirements.
+      if (isPastDate(parsedDate)) {
+        throw createHttpError('Cannot add costs with dates in the past', 400);
+      }
+    }
+
+    // Existing user validation starts here.
     // The next query verifies the user reference.
     // The user id in the cost must match a saved user.
     // User existence is checked before saving the cost.
@@ -153,10 +213,7 @@ app.post('/api/add', async (req, res, next) => {
     const userExists = await User.exists({ id: userid });
 
     if (!userExists) {
-      const error = new Error('Cannot add a cost for a non-existing user');
-      // A cost cannot reference a missing user.
-      error.statusCode = 404;
-      throw error;
+      throw createHttpError('Cannot add a cost for a non-existing user', 404);
     }
 
     // The cost document is created after all checks pass.
@@ -164,35 +221,18 @@ app.post('/api/add', async (req, res, next) => {
     // The cost is saved only after validation passes.
     // Mongoose validates the required cost fields.
     const createdCost = await Cost.create({
-      userid,
+      userid: Number(userid),
       description,
       // Category is normalized by the schema.
       category,
-      sum,
+      sum: Number(sum),
       date,
     });
-
-    // Cached reports depend on cost dates.
-    // Historical changes must invalidate the matching cached report.
-    if (createdCost.date) {
-      const itemDate = new Date(createdCost.date);
-      const cachedYear = itemDate.getUTCFullYear();
-      const cachedMonth = itemDate.getUTCMonth() + 1;
-
-      // The next report request will rebuild the cache.
-      if (isPastMonth(cachedYear, cachedMonth)) {
-        await Report.deleteOne({
-          userid: createdCost.userid,
-          // Delete only the report affected by this cost.
-          year: cachedYear,
-          month: cachedMonth,
-        });
-      }
-    }
 
     // Created costs are returned with status 201.
     res.status(201).json(createdCost);
   } catch (error) {
+    // Endpoint errors are normalized before response.
     // All add-cost errors are handled in one place.
     // Error handling keeps response codes clear.
     // The next block converts schema errors to client errors.
@@ -218,28 +258,28 @@ app.get('/api/report', async (req, res, next) => {
     const year = Number(req.query.year);
     const month = Number(req.query.month);
 
+    // Report query validation starts here.
     // All report query parameters must be numeric.
-    if ([userId, year, month].some(Number.isNaN)) {
-      const error = new Error('Query parameters id, year and month must be numbers');
-      error.statusCode = 400;
-      throw error;
+    if (![userId, year, month].every(Number.isFinite)) {
+      throw createHttpError('Query parameters id, year and month must be numbers', 400);
     }
 
     // Month values must follow the calendar range.
-    if (month < 1 || month > 12) {
-      const error = new Error('Month must be between 1 and 12');
-      error.statusCode = 400;
-      throw error;
+    if (!Number.isInteger(month) || month < 1 || month > 12) {
+      throw createHttpError('Month must be between 1 and 12', 400);
     }
 
+    // Year should not contain decimal values.
+    if (!Number.isInteger(year)) {
+      throw createHttpError('year must be an integer', 400);
+    }
+
+    // User lookup happens after basic query validation.
     // Reports are available only for existing users.
     const userExists = await User.exists({ id: userId });
 
     if (!userExists) {
-      const error = new Error('User not found');
-      // Missing users cannot have reports.
-      error.statusCode = 404;
-      throw error;
+      throw createHttpError('User not found', 404);
     }
 
     // Past months can use cached report documents.
@@ -265,6 +305,7 @@ app.get('/api/report', async (req, res, next) => {
       }
     }
 
+    // Compute the report when no cached result exists.
     // The next values define the MongoDB date filter.
     // The end date is the first day of the next month.
     // Dates are calculated as an inclusive-exclusive range.
@@ -310,6 +351,7 @@ app.get('/api/report', async (req, res, next) => {
           // Upsert makes this operation idempotent.
           upsert: true,
           new: true,
+          // Update options are kept explicit for readability.
           // The same call handles create and update.
           // Upsert options control insert/update behavior.
           // Upsert creates a new cache row when needed.

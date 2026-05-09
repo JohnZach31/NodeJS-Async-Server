@@ -18,6 +18,23 @@ const logger = pino({ name: serviceName });
 // Allows the service to read JSON request bodies.
 app.use(express.json());
 
+// Creates a normal Error object with an HTTP status code.
+const createHttpError = (message, statusCode) => {
+  const error = new Error(message);
+
+  // The error middleware reads this property.
+  error.statusCode = statusCode;
+  return error;
+};
+
+// Checks whether a value can be used as a number.
+const isValidNumber = (value) =>
+  value !== undefined && value !== null && Number.isFinite(Number(value));
+
+// Checks whether the given value is a non-empty string.
+const isNonEmptyString = (value) =>
+  typeof value === 'string' && value.trim().length > 0;
+
 // Persists every incoming request into the logs collection.
 app.use((req, res, next) => {
   const requestId = crypto.randomUUID();
@@ -61,13 +78,37 @@ app.post('/api/add', async (req, res, next) => {
   try {
     const { id, first_name, last_name, birthday } = req.body;
 
+    // User id must be a numeric value.
+    if (!isValidNumber(id)) {
+      throw createHttpError('id must be a valid number', 400);
+    }
+
+    // First name must not be empty.
+    if (!isNonEmptyString(first_name)) {
+      throw createHttpError('first_name must be a non-empty string', 400);
+    }
+
+    // Validate last name before parsing birthday.
+    // Last name is also required by the users schema.
+    if (!isNonEmptyString(last_name)) {
+      throw createHttpError('last_name must be a non-empty string', 400);
+    }
+
+    // Convert birthday to Date before saving the user.
+    const parsedBirthday = new Date(birthday);
+
+    // Birthday must be a valid date.
+    if (Number.isNaN(parsedBirthday.getTime())) {
+      throw createHttpError('birthday must be a valid date', 400);
+    }
+
     // Mongoose validates required fields and data types.
     const createdUser = await User.create({
       // The assignment uses a numeric user id.
-      id,
+      id: Number(id),
       first_name,
       last_name,
-      birthday,
+      birthday: parsedBirthday,
     });
 
     // Created users are returned with status 201.
@@ -103,10 +144,8 @@ app.get('/api/users/:id', async (req, res, next) => {
     const userId = Number(req.params.id);
 
     // The URL parameter must be a number.
-    if (Number.isNaN(userId)) {
-      const error = new Error('User id must be a valid number');
-      error.statusCode = 400;
-      throw error;
+    if (!Number.isFinite(userId)) {
+      throw createHttpError('User id must be a valid number', 400);
     }
 
     // Find the requested user before calculating costs.
@@ -118,9 +157,7 @@ app.get('/api/users/:id', async (req, res, next) => {
     // Stop early when the user does not exist.
     // A missing user returns a not found response.
     if (!user) {
-      const error = new Error('User not found');
-      error.statusCode = 404;
-      throw error;
+      throw createHttpError('User not found', 404);
     }
 
     // Aggregates all costs that belong to this user.
