@@ -1,0 +1,26 @@
+{
+  "name": "academic-cost-manager",
+  "version": "1.0.0",
+  "description": "Academic backend project with 4 Express services, MongoDB, Mongoose and Pino",
+  "main": "server1.js",
+  "scripts": {
+    "server1": "node server1.js",
+    "server2": "node server2.js",
+    "server3": "node server3.js",
+    "server4": "node server4.js"
+  },
+  "keywords": [
+    "express",
+    "mongoose",
+    "pino",
+    "mongodb"
+  ],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "dotenv": "^17.4.2",
+    "express": "^5.2.1",
+    "mongoose": "^9.6.1",
+    "pino": "^10.3.1"
+  }
+}
