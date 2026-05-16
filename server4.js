@@ -66,6 +66,11 @@ app.get('/api/about', (req, res) => {
       first_name: process.env.DEVELOPER2_FIRST_NAME || 'SecondDeveloper',
       last_name: process.env.DEVELOPER2_LAST_NAME || 'LastDeveloper',
     },
+    // Third developer is configured in the environment file.
+    {
+      first_name: process.env.DEVELOPER3_FIRST_NAME || 'ThirdDeveloper',
+      last_name: process.env.DEVELOPER3_LAST_NAME || 'LastDeveloper',
+    },
   ];
 
   // Returns the developers as a JSON array.
