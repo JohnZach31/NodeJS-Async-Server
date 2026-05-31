@@ -28,6 +28,32 @@ test('GET /api/about returns only developer names', async () => {
   assert.deepEqual(Object.keys(body[0]).sort(), ['first_name', 'last_name']);
 });
 
+test('POST /api/add rejects creating a duplicate user', async () => {
+  const id = Date.now() + 100;
+  const user = {
+    id,
+    first_name: 'duplicate',
+    last_name: 'user',
+    birthday: '2000-01-01',
+  };
+
+  const firstResponse = await requestJson(`${usersUrl}/api/add/`, {
+    method: 'POST',
+    body: JSON.stringify(user),
+  });
+
+  assert.equal(firstResponse.response.status, 201);
+
+  const duplicateResponse = await requestJson(`${usersUrl}/api/add/`, {
+    method: 'POST',
+    body: JSON.stringify(user),
+  });
+
+  assert.equal(duplicateResponse.response.status, 409);
+  assert.ok(duplicateResponse.body.id);
+  assert.ok(duplicateResponse.body.message);
+});
+
 // User creation and lookup are tested together.
 test('POST /api/add creates a user and GET /api/users/:id returns total', async () => {
   const id = Date.now();
@@ -68,6 +94,16 @@ test('GET /api/users returns an array of users', async () => {
   // Users list endpoint should return JSON array.
   assert.equal(response.status, 200);
   assert.ok(Array.isArray(body));
+});
+
+test('GET /api/users/:id returns JSON error for a missing user', async () => {
+  const { response, body } = await requestJson(
+    `${usersUrl}/api/users/${Date.now() + 200000}`
+  );
+
+  assert.equal(response.status, 404);
+  assert.ok(body.id);
+  assert.ok(body.message);
 });
 
 // Cost creation and report generation are tested together.
@@ -118,12 +154,32 @@ test('POST /api/add creates a cost and GET /api/report groups it', async () => {
   assert.equal(report.body.userid, id);
   // The report costs field must be an array by the spec.
   assert.ok(Array.isArray(report.body.costs));
+  assert.deepEqual(
+    report.body.costs.map((group) => Object.keys(group)[0]),
+    ['food', 'education', 'health', 'housing', 'sports']
+  );
 
   const foodGroup = report.body.costs.find((group) => group.food);
 
   // Food group must exist and include the test cost.
   assert.ok(foodGroup);
   assert.ok(foodGroup.food.some((cost) => cost.description === 'milk'));
+});
+
+test('POST /api/add rejects cost for a non-existing user', async () => {
+  const result = await requestJson(`${costsUrl}/api/add/`, {
+    method: 'POST',
+    body: JSON.stringify({
+      userid: Date.now() + 500000,
+      description: 'ghost cost',
+      category: 'food',
+      sum: 15,
+    }),
+  });
+
+  assert.equal(result.response.status, 404);
+  assert.ok(result.body.id);
+  assert.ok(result.body.message);
 });
 
 // Invalid cost dates should produce JSON errors.
@@ -158,6 +214,16 @@ test('POST /api/add rejects past cost dates', async () => {
 
   // The endpoint should reject the request before saving.
   // Error responses must include id and message.
+  assert.equal(result.response.status, 400);
+  assert.ok(result.body.id);
+  assert.ok(result.body.message);
+});
+
+test('GET /api/report rejects invalid query values', async () => {
+  const result = await requestJson(
+    `${costsUrl}/api/report/?id=123123&year=2026&month=13`
+  );
+
   assert.equal(result.response.status, 400);
   assert.ok(result.body.id);
   assert.ok(result.body.message);

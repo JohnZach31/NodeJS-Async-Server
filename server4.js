@@ -15,6 +15,38 @@ const logger = pino({ name: serviceName });
 // Allows the service to read JSON request bodies.
 app.use(express.json());
 
+// Creates a normal Error object with an HTTP status code.
+const createHttpError = (message, statusCode) => {
+  const error = new Error(message);
+
+  // The error middleware reads this property.
+  error.statusCode = statusCode;
+  return error;
+};
+
+// Reads developers from the environment without inventing extra members.
+const getDevelopersFromEnv = () => {
+  const rawDevelopers = [
+    {
+      first_name: process.env.DEVELOPER1_FIRST_NAME,
+      last_name: process.env.DEVELOPER1_LAST_NAME,
+    },
+    {
+      first_name: process.env.DEVELOPER2_FIRST_NAME,
+      last_name: process.env.DEVELOPER2_LAST_NAME,
+    },
+    {
+      first_name: process.env.DEVELOPER3_FIRST_NAME,
+      last_name: process.env.DEVELOPER3_LAST_NAME,
+    },
+  ];
+
+  // Keep only fully configured developers.
+  return rawDevelopers.filter(
+    (developer) => developer.first_name && developer.last_name
+  );
+};
+
 // Persists every incoming request into the logs collection.
 app.use((req, res, next) => {
   const requestId = crypto.randomUUID();
@@ -54,27 +86,23 @@ app.use((req, res, next) => {
 });
 
 // Returns the project developers from environment variables.
-app.get('/api/about', (req, res) => {
-  const developers = [
-    // First developer is configured in the environment file.
-    {
-      first_name: process.env.DEVELOPER1_FIRST_NAME || 'FirstDeveloper',
-      last_name: process.env.DEVELOPER1_LAST_NAME || 'LastDeveloper',
-    },
-    // Second developer is configured in the environment file.
-    {
-      first_name: process.env.DEVELOPER2_FIRST_NAME || 'SecondDeveloper',
-      last_name: process.env.DEVELOPER2_LAST_NAME || 'LastDeveloper',
-    },
-    // Third developer is configured in the environment file.
-    {
-      first_name: process.env.DEVELOPER3_FIRST_NAME || 'ThirdDeveloper',
-      last_name: process.env.DEVELOPER3_LAST_NAME || 'LastDeveloper',
-    },
-  ];
+app.get('/api/about', (req, res, next) => {
+  try {
+    const developers = getDevelopersFromEnv();
 
-  // Returns the developers as a JSON array.
-  res.json(developers);
+    // At least one real team member must be configured.
+    if (developers.length === 0) {
+      throw createHttpError(
+        'At least one developer must be configured in the .env file',
+        500
+      );
+    }
+
+    // Returns the developers as a JSON array.
+    res.json(developers);
+  } catch (error) {
+    next(error);
+  }
 });
 
 // Sends errors in one consistent JSON structure.

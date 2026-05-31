@@ -12,6 +12,7 @@ const Log = require('./models/Log');
 // Service settings are loaded from the environment.
 const port = Number(process.env.PORT3) || 3003;
 const serviceName = 'costs-service';
+const reportCategoryOrder = ['food', 'education', 'health', 'housing', 'sports'];
 
 const app = express();
 const logger = pino({ name: serviceName });
@@ -121,7 +122,7 @@ const buildReportSkeleton = (userId, year, month) => ({
   year,
   month,
   // Every category exists even when it has no costs.
-  costs: allowedCategories.map((category) => ({ [category]: [] })),
+  costs: reportCategoryOrder.map((category) => ({ [category]: [] })),
 });
 
 // A report is cacheable only when the month is fully in the past.
