@@ -7,7 +7,7 @@ const allowedCategories = ['food', 'health', 'housing', 'sports', 'education'];
 const costSchema = new mongoose.Schema(
   {
     // References the numeric user id from the users collection.
-    userid: {
+    userid: {     
       type: Number,
       required: true,
       index: true,
