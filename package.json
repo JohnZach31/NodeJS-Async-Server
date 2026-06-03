@@ -9,7 +9,8 @@
     "server3": "node server3.js",
     "server4": "node server4.js",
     "test": "node --test tests/endpoints.test.js",
-    "seed": "node scripts/seed-imaginary-user.js"
+    "seed": "node scripts/seed-imaginary-user.js",
+    "reset-submission-db": "node scripts/reset-submission-db.js"
   },
   "keywords": [
     "express",

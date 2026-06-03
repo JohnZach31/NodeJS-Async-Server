@@ -55,6 +55,9 @@ app.use((req, res, next) => {
 // Returns all saved request logs, newest first.
 app.get('/api/logs', async (req, res, next) => {
   try {
+    // Pino writes an explicit endpoint access message.
+    req.log.info('GET /api/logs endpoint accessed');
+
     const logs = await Log.find().sort({ createdAt: -1 }).lean();
     // Logs are returned as JSON documents.
     res.json(logs);

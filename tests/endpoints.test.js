@@ -54,6 +54,24 @@ test('POST /api/add rejects creating a duplicate user', async () => {
   assert.ok(duplicateResponse.body.message);
 });
 
+test('POST /api/add rejects invalid user payload', async () => {
+  const invalidUser = {
+    id: 'not-a-number',
+    first_name: '',
+    last_name: 'user',
+    birthday: 'bad-date',
+  };
+
+  const result = await requestJson(`${usersUrl}/api/add/`, {
+    method: 'POST',
+    body: JSON.stringify(invalidUser),
+  });
+
+  assert.equal(result.response.status, 400);
+  assert.ok(result.body.id);
+  assert.ok(result.body.message);
+});
+
 // User creation and lookup are tested together.
 test('POST /api/add creates a user and GET /api/users/:id returns total', async () => {
   const id = Date.now();
@@ -102,6 +120,14 @@ test('GET /api/users/:id returns JSON error for a missing user', async () => {
   );
 
   assert.equal(response.status, 404);
+  assert.ok(body.id);
+  assert.ok(body.message);
+});
+
+test('GET /api/users/:id rejects invalid id format', async () => {
+  const { response, body } = await requestJson(`${usersUrl}/api/users/not-a-number`);
+
+  assert.equal(response.status, 400);
   assert.ok(body.id);
   assert.ok(body.message);
 });
@@ -166,6 +192,34 @@ test('POST /api/add creates a cost and GET /api/report groups it', async () => {
   assert.ok(foodGroup.food.some((cost) => cost.description === 'milk'));
 });
 
+test('POST /api/add rejects invalid cost category', async () => {
+  const id = Date.now() + 300;
+
+  await requestJson(`${usersUrl}/api/add/`, {
+    method: 'POST',
+    body: JSON.stringify({
+      id,
+      first_name: 'category',
+      last_name: 'tester',
+      birthday: '2000-01-01',
+    }),
+  });
+
+  const result = await requestJson(`${costsUrl}/api/add/`, {
+    method: 'POST',
+    body: JSON.stringify({
+      userid: id,
+      description: 'invalid category',
+      category: 'travel',
+      sum: 21,
+    }),
+  });
+
+  assert.equal(result.response.status, 400);
+  assert.ok(result.body.id);
+  assert.ok(result.body.message);
+});
+
 test('POST /api/add rejects cost for a non-existing user', async () => {
   const result = await requestJson(`${costsUrl}/api/add/`, {
     method: 'POST',
@@ -225,6 +279,16 @@ test('GET /api/report rejects invalid query values', async () => {
   );
 
   assert.equal(result.response.status, 400);
+  assert.ok(result.body.id);
+  assert.ok(result.body.message);
+});
+
+test('GET /api/report returns JSON error for a missing user', async () => {
+  const result = await requestJson(
+    `${costsUrl}/api/report/?id=${Date.now() + 700000}&year=2026&month=5`
+  );
+
+  assert.equal(result.response.status, 404);
   assert.ok(result.body.id);
   assert.ok(result.body.message);
 });

@@ -76,6 +76,9 @@ app.use((req, res, next) => {
 // Creates a new user from the request body.
 app.post('/api/add', async (req, res, next) => {
   try {
+    // Pino writes an explicit endpoint access message.
+    req.log.info('POST /api/add endpoint accessed on users service');
+
     const { id, first_name, last_name, birthday } = req.body;
 
     // User id must be a numeric value.
@@ -130,6 +133,9 @@ app.post('/api/add', async (req, res, next) => {
 // Returns all users sorted by their numeric id.
 app.get('/api/users', async (req, res, next) => {
   try {
+    // Pino writes an explicit endpoint access message.
+    req.log.info('GET /api/users endpoint accessed');
+
     const users = await User.find().sort({ id: 1 }).lean();
     // The response is a simple array of users.
     res.json(users);
@@ -141,6 +147,9 @@ app.get('/api/users', async (req, res, next) => {
 // Returns one user together with the total expense sum.
 app.get('/api/users/:id', async (req, res, next) => {
   try {
+    // Pino writes an explicit endpoint access message.
+    req.log.info('GET /api/users/:id endpoint accessed');
+
     const userId = Number(req.params.id);
 
     // The URL parameter must be a number.

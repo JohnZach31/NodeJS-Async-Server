@@ -165,6 +165,9 @@ const buildComputedReport = (userId, year, month, costs) => {
 // Creates a new cost item for an existing user.
 app.post('/api/add', async (req, res, next) => {
   try {
+    // Pino writes an explicit endpoint access message.
+    req.log.info('POST /api/add endpoint accessed on costs service');
+
     const { userid, description, category, sum, date } = req.body;
 
     // Required fields must be present and valid.
@@ -255,6 +258,9 @@ app.post('/api/add', async (req, res, next) => {
 // Returns a monthly grouped report for one user.
 app.get('/api/report', async (req, res, next) => {
   try {
+    // Pino writes an explicit endpoint access message.
+    req.log.info('GET /api/report endpoint accessed');
+
     const userId = Number(req.query.id);
     const year = Number(req.query.year);
     const month = Number(req.query.month);

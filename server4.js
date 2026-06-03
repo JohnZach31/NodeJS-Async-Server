@@ -88,6 +88,9 @@ app.use((req, res, next) => {
 // Returns the project developers from environment variables.
 app.get('/api/about', (req, res, next) => {
   try {
+    // Pino writes an explicit endpoint access message.
+    req.log.info('GET /api/about endpoint accessed');
+
     const developers = getDevelopersFromEnv();
 
     // At least one real team member must be configured.
