@@ -9,7 +9,7 @@ const Log = require('./models/Log');
 
 // Users service owns user creation and user lookup.
 // Service settings are loaded from the environment.
-const port = Number(process.env.PORT2) || 3002;
+const port = Number(process.env.PORT) || Number(process.env.PORT2) || 3002;
 const serviceName = 'users-service';
 
 const app = express();

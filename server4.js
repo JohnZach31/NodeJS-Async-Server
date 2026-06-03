@@ -6,7 +6,7 @@ const { connectToDatabase } = require('./db');
 const Log = require('./models/Log');
 
 // Service settings are loaded from the environment.
-const port = Number(process.env.PORT4) || 3004;
+const port = Number(process.env.PORT) || Number(process.env.PORT4) || 3004;
 const serviceName = 'about-service';
 
 const app = express();

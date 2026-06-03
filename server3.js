@@ -10,7 +10,7 @@ const Log = require('./models/Log');
 
 // Costs service owns expenses and monthly reports.
 // Service settings are loaded from the environment.
-const port = Number(process.env.PORT3) || 3003;
+const port = Number(process.env.PORT) || Number(process.env.PORT3) || 3003;
 const serviceName = 'costs-service';
 const reportCategoryOrder = ['food', 'education', 'health', 'housing', 'sports'];
 
