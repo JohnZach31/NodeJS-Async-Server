@@ -1,73 +1,36 @@
-# NodeJS Async Server — Expense Tracker Backend
+# NodeJS Async Server
 
-A Node.js backend project that implements an asynchronous, multi-service expense tracking system using **Express**, **MongoDB**, **Mongoose**, and **Pino** logging.
+A small backend project for managing users, costs, reports, and request logs.
 
-The project is organized into four independent Express services. Each service runs on its own port, connects to MongoDB, exposes a focused set of API endpoints, and stores request logs for tracking and debugging.
+Built with **Node.js**, **Express**, **MongoDB**, and **Mongoose**.
 
----
-
-## Table of Contents
-
-- [Project Overview](#project-overview)
-- [Architecture](#architecture)
-- [Tech Stack](#tech-stack)
-- [Project Structure](#project-structure)
-- [Services](#services)
-- [API Endpoints](#api-endpoints)
-- [Database Models](#database-models)
-- [Computed Report Design Pattern](#computed-report-design-pattern)
-- [Request Logging](#request-logging)
-- [Environment Variables](#environment-variables)
-- [Installation](#installation)
-- [Running the Project](#running-the-project)
-- [Testing](#testing)
-- [Seeding the Database](#seeding-the-database)
-- [Example Requests](#example-requests)
-- [License](#license)
+The project is split into a few tiny services instead of one giant server file, because apparently we like making our lives organized.
 
 ---
 
-## Project Overview
+## What This Project Does
 
-This project is an academic backend assignment built around a cost management system.
+This backend lets you:
 
-The system supports:
+* Add users
+* Add cost items for users
+* Get monthly expense reports
+* View request logs
+* Return developer info
 
-- Creating users
-- Adding cost items for existing users
-- Generating monthly cost reports
-- Returning developer information
-- Saving request logs for every service
-- Caching old monthly reports using the Computed Design Pattern
-
-The backend is divided into separate services to keep responsibilities clear and to demonstrate a simple service-based architecture.
-
----
-
-## Architecture
-
-The project contains four Express servers:
-
-| Server | Service Name | Default Port | Responsibility |
-|---|---:|---:|---|
-| `server1.js` | `logs-service` | `3001` | Returns saved request logs |
-| `server2.js` | `users-service` | `3002` | Creates and reads users |
-| `server3.js` | `costs-service` | `3003` | Adds costs and generates reports |
-| `server4.js` | `about-service` | `3004` | Returns project developer details |
-
-Each service connects to the same MongoDB database and uses shared Mongoose models.
+It also saves request logs to MongoDB, so every request can be tracked later.
 
 ---
 
 ## Tech Stack
 
-- **Node.js**
-- **Express**
-- **MongoDB**
-- **Mongoose**
-- **Pino**
-- **dotenv**
-- **Node Test Runner**
+* Node.js
+* Express
+* MongoDB
+* Mongoose
+* dotenv
+* Pino logger
+* Node test runner
 
 ---
 
@@ -83,12 +46,221 @@ NodeJS-Async-Server/
 │   └── seed-imaginary-user.js
 ├── tests/
 │   └── endpoints.test.js
-├── .env.example
-├── .gitignore
 ├── db.js
-├── package.json
 ├── server1.js
 ├── server2.js
 ├── server3.js
 ├── server4.js
+├── package.json
+├── .env.example
 └── README.md
+```
+
+---
+
+## Services
+
+| File         |       Service |   Port | What it does                   |
+| ------------ | ------------: | -----: | ------------------------------ |
+| `server1.js` |  Logs service | `3001` | Shows saved request logs       |
+| `server2.js` | Users service | `3002` | Adds and reads users           |
+| `server3.js` | Costs service | `3003` | Adds costs and creates reports |
+| `server4.js` | About service | `3004` | Shows developer information    |
+
+Each service connects to the same MongoDB database.
+
+---
+
+## Main API Routes
+
+### Logs
+
+```http
+GET /api/logs
+```
+
+Returns saved request logs.
+
+---
+
+### Users
+
+```http
+POST /api/add
+GET /api/users
+GET /api/users/:id
+```
+
+Example user:
+
+```json
+{
+  "id": 123,
+  "first_name": "John",
+  "last_name": "Doe",
+  "birthday": "2000-01-01"
+}
+```
+
+---
+
+### Costs
+
+```http
+POST /api/add
+GET /api/report?id=123&year=2026&month=6
+```
+
+Example cost:
+
+```json
+{
+  "userid": 123,
+  "description": "Groceries",
+  "category": "food",
+  "sum": 80,
+  "date": "2026-06-04"
+}
+```
+
+Allowed categories:
+
+```txt
+food
+health
+housing
+sports
+education
+```
+
+---
+
+### About
+
+```http
+GET /api/about
+```
+
+Returns the developer names from the `.env` file.
+
+---
+
+## Monthly Reports
+
+The report endpoint groups costs by category for a specific user, year, and month.
+
+Example:
+
+```http
+GET /api/report?id=123&year=2026&month=6
+```
+
+Old monthly reports can be saved and reused instead of recalculating everything again every time.
+
+Because yes, even tiny projects deserve a little optimization arc.
+
+---
+
+## Environment Setup
+
+Create a `.env` file in the root folder.
+
+You can use `.env.example` as a base:
+
+```env
+MONGODB_URI=your_mongodb_connection_string
+
+PORT1=3001
+PORT2=3002
+PORT3=3003
+PORT4=3004
+
+DEVELOPER1_FIRST_NAME=John
+DEVELOPER1_LAST_NAME=Doe
+```
+
+Do not upload your real `.env` file to GitHub.
+
+Seriously. MongoDB passwords do not belong on the internet.
+
+---
+
+## Installation
+
+Clone the repo:
+
+```bash
+git clone https://github.com/JohnZach31/NodeJS-Async-Server.git
+```
+
+Enter the folder:
+
+```bash
+cd NodeJS-Async-Server
+```
+
+Install dependencies:
+
+```bash
+npm install
+```
+
+Create your `.env` file:
+
+```bash
+cp .env.example .env
+```
+
+Then edit `.env` with your real MongoDB connection string.
+
+---
+
+## Running the Project
+
+Each server runs separately.
+
+```bash
+npm run server1
+npm run server2
+npm run server3
+npm run server4
+```
+
+Usually, you would open a few terminal tabs and run one service in each tab.
+
+---
+
+## Running Tests
+
+```bash
+npm test
+```
+
+---
+
+## Seed Data
+
+To insert sample data:
+
+```bash
+npm run seed
+```
+
+---
+
+## Example Flow
+
+1. Start the users service.
+2. Add a user.
+3. Start the costs service.
+4. Add a cost for that user.
+5. Request a monthly report.
+6. Check the logs service to see the recorded requests.
+
+Tiny microservice-ish backend. Big student project energy.
+
+---
+
+## License
+
+MIT
